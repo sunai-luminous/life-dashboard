@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Life Dashboard</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // アイコン
+        const FileText = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>;
+        const BookOpen = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>;
+        const Briefcase = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0H8m8 0v6a2 2 0 01-2 2H10a2 2 0 01-2-2V6" /></svg>;
+        const Calendar = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>;
+        const Plus = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>;
+        const Edit3 = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>;
+        const Save = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3-3-3m3-3v12" /></svg>;
+        const X = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>;
+        const Download = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>;
+        const Upload = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>;
+
+        const LifeDashboard = () => {
+            const [activeTab, setActiveTab] = useState('diary');
+            const [diaryEntries, setDiaryEntries] = useState([]);
+            const [studyTasks, setStudyTasks] = useState([]);
+            const [workTasks, setWorkTasks] = useState([]);
+            const [shiftSchedule, setShiftSchedule] = useState([]);
+            const [newEntry, setNewEntry] = useState('');
+            const [editingId, setEditingId] = useState(null);
+            const [editText, setEditText] = useState('');
+
+            const STORAGE_KEYS = {
+                diary: 'lifeDashboard_diary',
+                study: 'lifeDashboard_study',
+                work: 'lifeDashboard_work',
+                shift: 'lifeDashboard_shift'
+            };
+
+            // ローカルストレージ管理
+            const saveToStorage = (key, data) => {
+                try {
+                    localStorage.setItem(key, JSON.stringify(data));
+                } catch (error) {
+                    console.error('保存エラー:', error);
+                }
+            };
+
+            const loadFromStorage = (key) => {
+                try {
+                    const stored = localStorage.getItem(key);
+                    return stored ? JSON.parse(stored) : [];
+                } catch (error) {
+                    return [];
+                }
+            };
+
+            useEffect(() => {
+                setDiaryEntries(loadFromStorage(STORAGE_KEYS.diary));
+                setStudyTasks(loadFromStorage(STORAGE_KEYS.study));
+                setWorkTasks(loadFromStorage(STORAGE_KEYS.work));
+                setShiftSchedule(loadFromStorage(STORAGE_KEYS.shift));
+            }, []);
+
+            useEffect(() => {
+                if (diaryEntries.length >= 0) saveToStorage(STORAGE_KEYS.diary, diaryEntries);
+            }, [diaryEntries]);
+
+            useEffect(() => {
+                if (studyTasks.length >= 0) saveToStorage(STORAGE_KEYS.study, studyTasks);
+            }, [studyTasks]);
+
+            useEffect(() => {
+                if (workTasks.length >= 0) saveToStorage(STORAGE_KEYS.work, workTasks);
+            }, [workTasks]);
+
+            useEffect(() => {
+                if (shiftSchedule.length >= 0) saveToStorage(STORAGE_KEYS.shift, shiftSchedule);
+            }, [shiftSchedule]);
+
+            // エクスポート機能
+            const downloadFile = (filename, content, type = 'text/plain') => {
+                const blob = new Blob([content], { type: `${type};charset=utf-8` });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            };
+
+            const exportData = () => {
+                const today = new Date().toISOString().split('T')[0];
+                let content = '';
+                
+                if (activeTab === 'diary') {
+                    content = `Life Dashboard 日記\n${'='.repeat(30)}\n\n`;
+                    diaryEntries.forEach((entry, index) => {
+                        content += `【${diaryEntries.length - index}】 ${entry.timestamp}\n${entry.content}\n\n`;
+                    });
+                    downloadFile(`日記_${today}.txt`, content);
+                } else if (activeTab === 'study') {
+                    content = `Life Dashboard 勉強記録\n${'='.repeat(30)}\n\n`;
+                    const completed = studyTasks.filter(t => t.completed);
+                    const pending = studyTasks.filter(t => !t.completed);
+                    
+                    content += `完了済み (${completed.length}件)\n${'-'.repeat(20)}\n`;
+                    completed.forEach(task => content += `✓ ${task.subject}\n`);
+                    
+                    content += `\n未完了 (${pending.length}件)\n${'-'.repeat(20)}\n`;
+                    pending.forEach(task => content += `□ ${task.subject}\n`);
+                    
+                    downloadFile(`勉強記録_${today}.txt`, content);
+                } else if (activeTab === 'work') {
+                    content = `Life Dashboard 仕事記録\n${'='.repeat(30)}\n\n`;
+                    const completed = workTasks.filter(t => t.completed);
+                    const pending = workTasks.filter(t => !t.completed);
+                    
+                    content += `完了済み (${completed.length}件)\n${'-'.repeat(20)}\n`;
+                    completed.forEach(task => content += `✓ ${task.subject}\n`);
+                    
+                    content += `\n未完了 (${pending.length}件)\n${'-'.repeat(20)}\n`;
+                    pending.forEach(task => content += `□ ${task.subject}\n`);
+                    
+                    downloadFile(`仕事記録_${today}.txt`, content);
+                } else if (activeTab === 'shift') {
+                    content = `Life Dashboard シフト記録\n${'='.repeat(30)}\n\n`;
+                    content += `シフトパターン: a1a2a3a4 z1 b1b2b3b4 z2 c1c2c3c4 z3z4\n`;
+                    content += `a:日勤 b:夜勤 c:深夜勤 z:休み\n\n`;
+                    shiftSchedule.forEach(schedule => {
+                        content += `${schedule.date}: ${schedule.shift}\n`;
+                    });
+                    downloadFile(`シフト記録_${today}.txt`, content);
+                }
+            };
+
+            const today = new Date().toISOString().split('T')[0];
+
+            // データ操作関数
+            const addDiaryEntry = () => {
+                if (newEntry.trim()) {
+                    const entry = {
+                        id: Date.now(),
+                        content: newEntry,
+                        timestamp: new Date().toLocaleString('ja-JP')
+                    };
+                    setDiaryEntries([entry, ...diaryEntries]);
+                    setNewEntry('');
+                }
+            };
+
+            const addTask = (taskType) => {
+                if (newEntry.trim()) {
+                    const task = {
+                        id: Date.now(),
+                        subject: newEntry,
+                        completed: false,
+                        date: today
+                    };
+                    if (taskType === 'study') {
+                        setStudyTasks([...studyTasks, task]);
+                    } else if (taskType === 'work') {
+                        setWorkTasks([...workTasks, task]);
+                    }
+                    setNewEntry('');
+                }
+            };
+
+            const addShift = () => {
+                if (newEntry.trim()) {
+                    const shift = {
+                        id: Date.now(),
+                        date: today,
+                        shift: newEntry
+                    };
+                    setShiftSchedule([...shiftSchedule, shift]);
+                    setNewEntry('');
+                }
+            };
+
+            const toggleTask = (id, taskType) => {
+                if (taskType === 'study') {
+                    setStudyTasks(studyTasks.map(task =>
+                        task.id === id ? { ...task, completed: !task.completed } : task
+                    ));
+                } else if (taskType === 'work') {
+                    setWorkTasks(workTasks.map(task =>
+                        task.id === id ? { ...task, completed: !task.completed } : task
+                    ));
+                }
+            };
+
+            const deleteItem = (id, type) => {
+                if (type === 'diary') {
+                    setDiaryEntries(diaryEntries.filter(entry => entry.id !== id));
+                } else if (type === 'study') {
+                    setStudyTasks(studyTasks.filter(task => task.id !== id));
+                } else if (type === 'work') {
+                    setWorkTasks(workTasks.filter(task => task.id !== id));
+                } else if (type === 'shift') {
+                    setShiftSchedule(shiftSchedule.filter(shift => shift.id !== id));
+                }
+            };
+
+            const tabs = [
+                { id: 'diary', name: '日記', icon: FileText, color: 'blue' },
+                { id: 'study', name: '勉強', icon: BookOpen, color: 'green' },
+                { id: 'work', name: '仕事', icon: Briefcase, color: 'purple' },
+                { id: 'shift', name: 'シフト', icon: Calendar, color: 'orange' }
+            ];
+
+            const currentData = () => {
+                switch (activeTab) {
+                    case 'diary': return diaryEntries;
+                    case 'study': return studyTasks;
+                    case 'work': return workTasks;
+                    case 'shift': return shiftSchedule;
+                    default: return [];
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+                    <div className="max-w-4xl mx-auto">
+                        {/* ヘッダー */}
+                        <div className="text-center mb-8">
+                            <h1 className="text-3xl font-bold text-gray-800 mb-2">Life Dashboard</h1>
+                            <p className="text-gray-600">{new Date().toLocaleDateString('ja-JP', {
+                                year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
+                            })}</p>
+                        </div>
+
+                        {/* タブナビゲーション */}
+                        <div className="flex justify-center mb-6">
+                            <div className="bg-white rounded-xl p-1 shadow-lg">
+                                {tabs.map(tab => {
+                                    const Icon = tab.icon;
+                                    return (
+                                        <button
+                                            key={tab.id}
+                                            onClick={() => setActiveTab(tab.id)}
+                                            className={`flex items-center px-6 py-3 rounded-lg transition-all font-medium ${
+                                                activeTab === tab.id
+                                                    ? `bg-${tab.color}-500 text-white shadow-md`
+                                                    : 'text-gray-600 hover:bg-gray-100'
+                                            }`}
+                                        >
+                                            <Icon />
+                                            <span className="ml-2">{tab.name}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* エクスポートボタン */}
+                        <div className="flex justify-center mb-6">
+                            <button
+                                onClick={exportData}
+                                className="flex items-center px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors"
+                            >
+                                <Download />
+                                <span className="ml-2">{tabs.find(t => t.id === activeTab)?.name}をエクスポート</span>
+                            </button>
+                        </div>
+
+                        {/* メインコンテンツ */}
+                        <div className="bg-white rounded-xl shadow-lg p-6">
+                            {/* 入力エリア */}
+                            <div className="mb-6">
+                                {activeTab === 'diary' ? (
+                                    <textarea
+                                        value={newEntry}
+                                        onChange={(e) => setNewEntry(e.target.value)}
+                                        placeholder="今日の出来事を書いてください..."
+                                        className="w-full p-4 border-2 border-gray-200 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        rows="3"
+                                    />
+                                ) : (
+                                    <input
+                                        type="text"
+                                        value={newEntry}
+                                        onChange={(e) => setNewEntry(e.target.value)}
+                                        placeholder={
+                                            activeTab === 'study' ? '勉強する科目やタスクを入力...' :
+                                            activeTab === 'work' ? '仕事のタスクを入力...' :
+                                            'シフト情報を入力 (例: a1, b2, c3, z1)...'
+                                        }
+                                        className="w-full p-4 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                )}
+                                <button
+                                    onClick={() => {
+                                        if (activeTab === 'diary') addDiaryEntry();
+                                        else if (activeTab === 'study') addTask('study');
+                                        else if (activeTab === 'work') addTask('work');
+                                        else if (activeTab === 'shift') addShift();
+                                    }}
+                                    className="mt-3 flex items-center px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+                                >
+                                    <Plus />
+                                    <span className="ml-2">追加</span>
+                                </button>
+                            </div>
+
+                            {/* データ表示エリア */}
+                            <div className="space-y-3">
+                                {activeTab === 'diary' && diaryEntries.map(entry => (
+                                    <div key={entry.id} className="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-400">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <span className="text-sm text-gray-500">{entry.timestamp}</span>
+                                            <button
+                                                onClick={() => deleteItem(entry.id, 'diary')}
+                                                className="text-gray-400 hover:text-red-500"
+                                            >
+                                                <X />
+                                            </button>
+                                        </div>
+                                        <p className="text-gray-700 whitespace-pre-wrap">{entry.content}</p>
+                                    </div>
+                                ))}
+
+                                {(activeTab === 'study' || activeTab === 'work') && (
+                                    <>
+                                        {(activeTab === 'study' ? studyTasks : workTasks).map(task => (
+                                            <div key={task.id} className={`flex items-center justify-between p-4 rounded-lg border-2 ${
+                                                task.completed 
+                                                    ? (activeTab === 'study' ? 'bg-green-50 border-green-200' : 'bg-purple-50 border-purple-200')
+                                                    : 'bg-gray-50 border-gray-200'
+                                            }`}>
+                                                <div className="flex items-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={task.completed}
+                                                        onChange={() => toggleTask(task.id, activeTab)}
+                                                        className={`mr-4 w-5 h-5 rounded focus:ring-2 ${
+                                                            activeTab === 'study' 
+                                                                ? 'text-green-600 focus:ring-green-500' 
+                                                                : 'text-purple-600 focus:ring-purple-500'
+                                                        }`}
+                                                    />
+                                                    <span className={`text-lg ${task.completed ? 'line-through text-gray-500' : 'text-gray-700'}`}>
+                                                        {task.subject}
+                                                    </span>
+                                                </div>
+                                                <button
+                                                    onClick={() => deleteItem(task.id, activeTab)}
+                                                    className="text-gray-400 hover:text-red-500"
+                                                >
+                                                    <X />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </>
+                                )}
+
+                                {activeTab === 'shift' && (
+                                    <>
+                                        <div className="mb-4 p-3 bg-orange-50 rounded-lg border border-orange-200">
+                                            <p className="text-sm text-gray-600">
+                                                <strong>シフトパターン:</strong> a1a2a3a4 z1 b1b2b3b4 z2 c1c2c3c4 z3z4<br />
+                                                a:日勤 b:夜勤 c:深夜勤 z:休み (z3は深夜勤明けの休み)
+                                            </p>
+                                        </div>
+                                        {shiftSchedule.map(shift => (
+                                            <div key={shift.id} className="flex items-center justify-between p-4 bg-orange-50 rounded-lg border-2 border-orange-200">
+                                                <div className="flex items-center">
+                                                    <span className="bg-orange-500 text-white px-3 py-1 rounded-lg font-bold mr-4">
+                                                        {shift.shift}
+                                                    </span>
+                                                    <span className="text-gray-600">{shift.date}</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => deleteItem(shift.id, 'shift')}
+                                                    className="text-gray-400 hover:text-red-500"
+                                                >
+                                                    <X />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </>
+                                )}
+                            </div>
+
+                            {/* データ件数表示 */}
+                            <div className="mt-6 text-center text-gray-500">
+                                {activeTab === 'diary' && `${diaryEntries.length}件の日記`}
+                                {activeTab === 'study' && `${studyTasks.filter(t => t.completed).length}/${studyTasks.length}件完了`}
+                                {activeTab === 'work' && `${workTasks.filter(t => t.completed).length}/${workTasks.length}件完了`}
+                                {activeTab === 'shift' && `${shiftSchedule.length}件のシフト`}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<LifeDashboard />, document.getElementById('root'));
+    </script>
+</body>
+</html>
